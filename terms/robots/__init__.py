@@ -16,3 +16,9 @@
 # You should have received a copy of the GNU General Public License
 # along with any part of the terms project.
 # If not, see <http://www.gnu.org/licenses/>.
+
+schemata = {}
+
+def get_model(name):
+    if name in schemata:
+        return schemata[name]

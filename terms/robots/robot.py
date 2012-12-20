@@ -24,6 +24,7 @@ import terms.core
 from terms.core.compiler import KnowledgeBase
 from terms.core.network import Network
 from terms.core.terms import Base, Term, Predicate, isa
+import terms.robots
 
 from bottle import get, post, request, response, static_file
 
@@ -46,13 +47,10 @@ class TermsPlugin(object):
     api = 2
     name = 'terms'
 
-    def __init__(self, name):
-        self.config = config = ConfigParser()
-        d = os.path.dirname(sys.modules['terms.core'].__file__)
-        fname = os.path.join(d, 'etc', 'terms.cfg')
-        config.readfp(open(fname))
-        config.read([os.path.join('etc', 'terms.cfg'), os.path.expanduser('~/.terms.cfg')])
-        config = config[name]
+    def __init__(self, config):
+        if 'schemata' in config
+            schemata = __import__(config['schemata'])
+            terms.robots.schemata.update(schemata.__dict__)
         address = '%s/%s' % (config['dbms'], config['dbname'])
         engine = create_engine(address)
         Session = sessionmaker(bind=engine)
@@ -63,7 +61,7 @@ class TermsPlugin(object):
         self.kb = KnowledgeBase(session, config)
         if 'exec_globals' in config:
             exec_globals = __import__(config['exec_globals'])
-            terms.core.exec_globals.update(exec_globals)
+            terms.core.exec_globals.update(exec_globals.__dict__)
         if 'action_map' in config:
             am = config['action_map']
             am = dict([(pair[0].strip(), __import__(pair[1].strip())) for pair in 
