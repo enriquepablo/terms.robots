@@ -15,7 +15,6 @@ import os
 import sys
 import json
 import inspect
-from configparser import ConfigParser
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -26,11 +25,11 @@ from terms.core.network import Network
 from terms.core.terms import Base, Term, Predicate, isa
 import terms.robots
 
-from bottle import get, post, request, response, static_file
-
+from bottle import get, post
 
 
 STATIC = os.path.join(os.path.dirname(sys.modules['terms.http'].__file__), 'static')
+
 
 class TermsJSONEncoder(json.JSONEncoder):
 
@@ -48,9 +47,11 @@ class TermsPlugin(object):
     name = 'terms'
 
     def __init__(self, config):
-        if 'schemata' in config
-            schemata = __import__(config['schemata'])
-            terms.robots.schemata.update(schemata.__dict__)
+        if 'plugins' in config:
+            plugins = config['plugins'].strip().split('\n')
+            for plugin in plugins:
+                schemata = __import__(plugin + '.schemata')
+                terms.robots.schemata.__dict__.update(schemata.__dict__)
         address = '%s/%s' % (config['dbms'], config['dbname'])
         engine = create_engine(address)
         Session = sessionmaker(bind=engine)
@@ -59,20 +60,17 @@ class TermsPlugin(object):
             Base.metadata.create_all(engine)
             Network.initialize(session)
         self.kb = KnowledgeBase(session, config)
-        if 'exec_globals' in config:
-            exec_globals = __import__(config['exec_globals'])
-            terms.core.exec_globals.update(exec_globals.__dict__)
-        if 'action_map' in config:
-            am = config['action_map']
-            am = dict([(pair[0].strip(), __import__(pair[1].strip())) for pair in 
-                                   [line.split('=') for line in am.strip().split('\n')]])
-            self.kb.actions.update(am)
+        if 'plugins' in config:
+            plugins = config['plugins'].strip().split('\n')
+            for plugin in plugins:
+                exec_globals = __import__(plugin + '.exec_globals')
+                terms.core.exec_globals.__dict__.update(exec_globals.__dict__)
+                actions = __import__(plugin + '.actions')
+                self.kb.actions.update(actions.__dict__)
         if 'import' in config:
             self.kb.compile_import(config['import'])
 
-
     def apply(self, callback, context):
-
         args = inspect.getargspec(context.callback)[0]
         if 'kb' not in args:
             return callback
@@ -87,8 +85,8 @@ class TermsPlugin(object):
 # @get('/')
 # def index():
 #     return static_file('index.html', root=STATIC, mimetype='text/html')
-# 
-# 
+#
+#
 # @get('/static/<filepath:path>')
 # def static(filepath):
 #     return static_file(filepath, root=STATIC)
@@ -135,4 +133,3 @@ def post_term(term, type, kb):
 def post_facts(facts, kb):
     resp = kb.parse(facts + '.')
     return json.dumps(resp, cls=TermsJSONEncoder)
-
