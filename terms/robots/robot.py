@@ -25,10 +25,10 @@ from terms.core.network import Network
 from terms.core.terms import Base, Term, Predicate, isa
 import terms.robots
 
-from bottle import get, post
+from bottle import get, post, static_file
 
 
-STATIC = os.path.join(os.path.dirname(sys.modules['terms.http'].__file__), 'static')
+STATIC = os.path.join(os.path.dirname(sys.modules['terms.robots'].__file__), 'static')
 
 
 class TermsJSONEncoder(json.JSONEncoder):
@@ -47,11 +47,12 @@ class TermsPlugin(object):
     name = 'terms'
 
     def __init__(self, config):
+        plugins = []
         if 'plugins' in config:
-            plugins = config['plugins'].strip().split('\n')
-            for plugin in plugins:
-                schemata = __import__(plugin + '.schemata')
-                terms.robots.schemata.__dict__.update(schemata.__dict__)
+            plugins = [p for p in config['plugins'].strip().split('\n') if p]
+        for plugin in plugins:
+            schemata = __import__(plugin + '.schemata')
+            terms.robots.schemata.update(schemata.__dict__)
         address = '%s/%s' % (config['dbms'], config['dbname'])
         engine = create_engine(address)
         Session = sessionmaker(bind=engine)
@@ -60,13 +61,11 @@ class TermsPlugin(object):
             Base.metadata.create_all(engine)
             Network.initialize(session)
         self.kb = KnowledgeBase(session, config)
-        if 'plugins' in config:
-            plugins = config['plugins'].strip().split('\n')
-            for plugin in plugins:
-                exec_globals = __import__(plugin + '.exec_globals')
-                terms.core.exec_globals.__dict__.update(exec_globals.__dict__)
-                actions = __import__(plugin + '.actions')
-                self.kb.actions.update(actions.__dict__)
+        for plugin in plugins:
+            exec_globals = __import__(plugin + '.exec_globals')
+            terms.core.exec_globals.update(exec_globals.__dict__)
+            actions = __import__(plugin + '.actions')
+            self.kb.actions.update(actions.__dict__)
         if 'import' in config:
             self.kb.compile_import(config['import'])
 
@@ -82,14 +81,14 @@ class TermsPlugin(object):
         return wrapper
 
 
-# @get('/')
-# def index():
-#     return static_file('index.html', root=STATIC, mimetype='text/html')
-#
-#
-# @get('/static/<filepath:path>')
-# def static(filepath):
-#     return static_file(filepath, root=STATIC)
+@get('/')
+def index():
+    return static_file('index.html', root=STATIC, mimetype='text/html')
+
+
+@get('/static/<filepath:path>')
+def static(filepath):
+    return static_file(filepath, root=STATIC)
 
 
 @get('/terms/<type_name>')
