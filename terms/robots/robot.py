@@ -28,7 +28,8 @@ import terms.robots
 from bottle import get, post, static_file
 
 
-STATIC = os.path.join(os.path.dirname(sys.modules['terms.robots'].__file__), 'static')
+STATIC = os.path.join(os.path.dirname(sys.modules['terms.robots'].__file__),
+                      'static')
 
 
 class TermsJSONEncoder(json.JSONEncoder):
@@ -47,11 +48,11 @@ class TermsPlugin(object):
     name = 'terms'
 
     def __init__(self, config):
-        plugins = []
-        if 'plugins' in config:
-            plugins = [p for p in config['plugins'].strip().split('\n') if p]
-        for plugin in plugins:
-            schemata = __import__(plugin + '.schemata')
+        apps = []
+        if 'apps' in config:
+            apps = [p for p in config['apps'].strip().split('\n') if p]
+        for app in apps:
+            schemata = __import__(app + '.schemata')
             terms.robots.schemata.update(schemata.__dict__)
         address = '%s/%s' % (config['dbms'], config['dbname'])
         engine = create_engine(address)
@@ -61,13 +62,14 @@ class TermsPlugin(object):
             Base.metadata.create_all(engine)
             Network.initialize(session)
         self.kb = KnowledgeBase(session, config)
-        for plugin in plugins:
-            exec_globals = __import__(plugin + '.exec_globals')
+        for app in apps:
+            exec_globals = __import__(app + '.exec_globals')
             terms.core.exec_globals.update(exec_globals.__dict__)
-            actions = __import__(plugin + '.actions')
+            actions = __import__(app + '.actions')
             self.kb.actions.update(actions.__dict__)
-        if 'import' in config:
-            self.kb.compile_import(config['import'])
+        for app in apps:
+            d = os.path.dirname(sys.modules[app].__file__)
+            self.kb.compile_import(os.path.join(d, 'ontology'))
 
     def apply(self, callback, context):
         args = inspect.getargspec(context.callback)[0]
