@@ -1,0 +1,39 @@
+body {
+    text-align: center;
+}
+
+div#fact-builder {
+    margin-top: 50px;
+}
+
+span.verb {
+    font-weight: 800;
+    margin: 0.2em;
+    color: #364;
+}
+
+span.object {
+    font-weight: 400;
+    color: #336;
+    margin: 0.2em;
+}
+
+span.label {
+    font-weight: 400;
+    color: #999;
+    font-size: 0.9em;
+    margin: 0.2em;
+}
+
+table#resp {
+    margin-left: auto;
+    margin-right: auto;
+}
+
+div#response {
+    margin-top: 40px;
+}
+
+table {
+    color: #228;
+}
