@@ -4,6 +4,8 @@ from sqlalchemy import String
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm.exc import NoResultFound
 
+from terms.core.terms import get_bases
+
 
 class Schema(object):
 
@@ -24,8 +26,20 @@ class Schema(object):
 Schema = declarative_base(cls=Schema)
 
 
+class SchemaNotFound(Exception):
+    pass
+
+
 def get_schema(noun):
-    return globals()[noun.name]
+    schema = globals().get(noun.name.title(), None)
+    if schema:
+        return schema
+    else:
+        for n in get_bases(noun):
+            name = n.name.title()
+            if name in globals():
+                return globals()[name]
+    raise SchemaNotFound(noun.name)
 
 
 def get_data(kb, name):
