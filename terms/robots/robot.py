@@ -83,7 +83,7 @@ class TermsPlugin(object):
         return wrapper
 
 
-@get('/')
+@get('/admin')
 def index():
     return static_file('index.html', root=STATIC, mimetype='text/html')
 
