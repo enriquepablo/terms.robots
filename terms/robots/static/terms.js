@@ -18,7 +18,7 @@
         this.parent = parent;
         this.child_mode = child_mode;
         this.gen_mode = gen_mode;
-        this.elem = $('<select></select>');
+        this.elem = $('<select class="' + child_mode + '"></select>');
         this.elem.append($('<option>---</option>'));
         var that = this;
         $.get('/terms/' + this.type, function (data) {
@@ -30,6 +30,17 @@
         var that = this;
         this.elem.change(function (e) {
             that.parent.notify(that.elem.val(), that.child_mode);
+            that.opts = that.elem.find('option:selected').siblings();
+            that.opts.hide();
+        });
+        this.elem.mouseleave(function (e) {
+            if (that.elem.val() !== '---') {
+                that.opts = that.elem.find('option:selected').siblings();
+                that.opts.hide();
+            }
+        });
+        this.elem.mouseenter(function (e) {
+            that.opts.show();
         });
     };
 
