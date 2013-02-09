@@ -13,11 +13,10 @@
         });
     };
 
-    function Syntagm (type, parent, child_mode, gen_mode) {
+    function Syntagm (type, parent, child_mode) {
         this.type = type;
         this.parent = parent;
         this.child_mode = child_mode;
-        this.gen_mode = gen_mode;
         this.elem = $('<select class="' + child_mode + '"></select>');
         this.elem.append($('<option>---</option>'));
         var that = this;
@@ -29,7 +28,12 @@
     Syntagm.prototype.load_event = function () {
         var that = this;
         this.elem.change(function (e) {
-            that.parent.notify(that.elem.val(), that.child_mode);
+            var vars = false;
+            var val = that.elem.val();
+            if (val[0] === val[0].toUpperCase()) {
+                vars = true;
+            }
+            that.parent.notify(that.elem.val(), that.child_mode, vars);
             that.opts = that.elem.find('option:selected').siblings();
             that.opts.hide();
         });
@@ -49,16 +53,16 @@
             e = $('<option>' + data[n] + '</option>');
             this.elem.append(e);
         }
+        this.opts = this.elem.find('option:selected').siblings();
     };
 
     Syntagm.prototype.to_trm = function () {
         return this.elem.val();
     };
 
-    function Modifier (label, val, parent, gen_mode) {
+    function Modifier (label, val, parent) {
         this.label = label;
         this.parent = parent;
-        this.gen_mode = gen_mode;
         this.elem = $('<span class="arg"></span>');
         var lspan = $('<span class="label">' + label + '</span>');
         this.elem.append(lspan);
@@ -82,7 +86,7 @@
         this.elem.append(this.submitter.elem);
     }
 
-    Definition.prototype.notify = function (val, child_mode) {
+    Definition.prototype.notify = function (val, child_mode, vars) {
         if (this.val.val() == '---') {
             this.submitter.elem.hide();
         } else {
@@ -90,20 +94,23 @@
         }
     };
 
-    function Fact (gen_mode, parent) {
+    function Fact (parent) {
         this.gen_type = 'fact';
-        this.gen_mode = gen_mode;
         this.parent = parent;
         this.elem = $('<span></span>');
         this.lparen();
-        this.verb = new Syntagm('verb', this, 'verb', gen_mode);
+        this.verb = new Syntagm('verb', this, 'verb');
         this.verb.load_event();
         this.elem.append(this.verb.elem);
         if (this.parent === null) {
-            this.submitter = new Submitter(this, gen_mode);
-            this.submitter.load_event();
-            this.submitter.elem.hide();
-            this.elem.append(this.submitter.elem);
+            this.asker = new Submitter(this, 'ask');
+            this.asker.load_event();
+            this.asker.elem.hide();
+            this.elem.append(this.asker.elem);
+            this.teller = new Submitter(this, 'tell');
+            this.teller.load_event();
+            this.teller.elem.hide();
+            this.elem.append(this.teller.elem);
         }
         this.rparen();
     }
@@ -118,25 +125,41 @@
         this.elem.append(rparen);
     };
 
-    Fact.prototype.notify = function (val, child_mode) {
+    Fact.prototype.notify = function (val, child_mode, vars) {
         if (child_mode === 'verb'){
             this.update_verb(val);
-        } else if (child_mode === 'arg') {
-            if ((this.subject.elem.val() !== '---') &&
-                (this.verb.elem.val() !== '---')) {
-                  for (var arg in this.args) {
-                      if (this.args[arg].val.elem.val() === '---') {
-                          if (this.parent === null) {
-                              this.submitter.elem.hide();
-                          }
-                          return
-                      }
-                  }
-                  if (this.parent === null) {
-                      this.submitter.elem.show();
-                  } else {
-                      this.parent.notify(this, 'arg');
-                  }
+        } else if ((child_mode === 'arg') || (child_mode === 'subject')) {
+            var sval = this.subject.elem.val();
+            var vval = this.verb.elem.val();
+            if ((sval !== '---') && (vval !== '---')) {
+                if ((sval[0] === sval[0].toUpperCase()) ||
+                    (vval[0] === vval[0].toUpperCase())) {
+                    vars = true;
+                }
+                for (var arg in this.args) {
+                    var aval = this.args[arg].val.to_trm();
+                    if (aval === '---') {
+                        if (this.parent === null) {
+                            this.asker.elem.hide();
+                            this.teller.elem.hide();
+                        }
+                        return
+                    } else if ((aval[0] !== '(') && (aval[0] === aval[0].toUpperCase())) {
+                        if (this.parent === null) {
+                            this.teller.elem.hide();
+                        }
+                        vars = true;
+                    }
+                }
+                if (this.parent === null) {
+                    this.asker.elem.show();
+                    this.teller.elem.hide();
+                    if (!vars) {
+                        this.teller.elem.show();
+                    }
+                } else {
+                    this.parent.notify(this, 'arg', vars);
+                }
             }
         }
     };
@@ -158,15 +181,15 @@
             if (o[0].indexOf('_') == o[0].length - 1) {
                 continue;
             } else if (o[0] == 'subj') {
-                this.subject = new Syntagm(o[1], this, 'subject', this.gen_mode);
+                this.subject = new Syntagm(o[1], this, 'subject');
             } else if (o[2]) {
-                var val = new Fact(this.gen_mode, this);
-                var mod = new Modifier (o[0], val, this, this.gen_mode)
+                var val = new Fact(this);
+                var mod = new Modifier (o[0], val, this)
                 this.args.push(mod);
             } else {
-                var val = new Syntagm(o[1], this, 'arg', this.gen_mode);
+                var val = new Syntagm(o[1], this, 'arg');
                 val.load_event();
-                var mod = new Modifier (o[0], val, this, this.gen_mode)
+                var mod = new Modifier (o[0], val, this)
                 this.args.push(mod);
             }
         }
@@ -182,9 +205,12 @@
         }
         this.rparen();
         if (this.parent === null) {
-            this.submitter.load_event();
-            this.submitter.elem.hide();
-            this.elem.append(this.submitter.elem);
+            this.asker.load_event();
+            this.asker.elem.hide();
+            this.elem.append(this.asker.elem);
+            this.teller.load_event();
+            this.teller.elem.hide();
+            this.elem.append(this.teller.elem);
         }
     };
 
@@ -228,11 +254,7 @@
             elems.to_ask.html(def.elem);
         });
         elems.to_tell_fact.click(function () {
-            var fact = new Fact('tell', null);
-            elems.to_ask.html(fact.elem);
-        });
-        elems.to_ask_fact.click(function () {
-            var fact = new Fact('ask', null);
+            var fact = new Fact(null);
             elems.to_ask.html(fact.elem);
         });
     }
@@ -265,7 +287,6 @@
     $(document).ready(function () {
         elems.to_tell_name = $('#to-tell-name');
         elems.to_tell_fact = $('#to-tell-fact');
-        elems.to_ask_fact = $('#to-ask-fact');
         elems.to_ask = $('#to-ask');
         elems.to_answer = $('#to-answer');
         initialize();
