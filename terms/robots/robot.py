@@ -16,16 +16,17 @@ import sys
 import json
 import inspect
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 
-import terms.core
 from terms.core.compiler import KnowledgeBase
-from terms.core.network import Network
-from terms.core.terms import Base, Term, Predicate, isa
-import terms.robots
+from terms.core.terms import Term, Predicate, isa
+from terms.core import sa
+from terms.core.pluggable import init_environment
+
+from terms.core.schemata import get_form_schema
 
 from bottle import get, post, static_file
+
+from deform import Form
 
 
 STATIC = os.path.join(os.path.dirname(sys.modules['terms.robots'].__file__),
@@ -48,28 +49,9 @@ class TermsPlugin(object):
     name = 'terms'
 
     def __init__(self, config):
-        apps = []
-        if 'apps' in config:
-            apps = [p for p in config['apps'].strip().split('\n') if p]
-        for app in apps:
-            schemata = __import__(app + '.schemata')
-            terms.robots.schemata.update(schemata.__dict__)
-        address = '%s/%s' % (config['dbms'], config['dbname'])
-        engine = create_engine(address)
-        Session = sessionmaker(bind=engine)
-        session = Session()
-        if config['dbname'] == ':memory:':
-            Base.metadata.create_all(engine)
-            Network.initialize(session)
-        self.kb = KnowledgeBase(session, config)
-        for app in apps:
-            exec_globals = __import__(app + '.exec_globals')
-            terms.core.exec_globals.update(exec_globals.__dict__)
-            actions = __import__(app + '.actions')
-            self.kb.actions.update(actions.__dict__)
-        for app in apps:
-            d = os.path.dirname(sys.modules[app].__file__)
-            self.kb.compile_import(os.path.join(d, 'ontology'))
+        init_environment(config)
+        Session = sa.get_sasession(config)
+        self.kb = KnowledgeBase(Session(), config)
 
     def apply(self, callback, context):
         args = inspect.getargspec(context.callback)[0]
@@ -134,3 +116,11 @@ def post_term(term, type, kb):
 def post_facts(facts, kb):
     resp = kb.parse(facts + '.')
     return json.dumps(resp, cls=TermsJSONEncoder)
+
+
+@get('/form/<noun>')
+def get_form(noun, kb):
+    term = kb.lexicon.get_term(noun)
+    schema = get_form_schema(term)
+    form = Form(schema, buttons=('submit',))
+    return form.render()

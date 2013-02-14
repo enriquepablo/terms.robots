@@ -22,7 +22,7 @@
 #distribute_setup.use_setuptools()
 from setuptools import setup, find_packages
 
-VERSION = '0.1.0a1dev1'
+VERSION = '0.1.0a1dev2'
 
 setup(
     name = 'terms.robots',
@@ -53,5 +53,7 @@ setup(
     install_requires = [
         'bottle',
         'Terms[PG]',
+        'deform',
+        'colanderalchemy',
     ],
 )
